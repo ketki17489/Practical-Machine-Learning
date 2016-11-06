@@ -1,0 +1,117 @@
+---
+title: "Practical Machine Learning"
+author: "Ketki Muzumdar"
+date: "November 4, 2016"
+output: html_document
+---
+
+
+# Synopsis
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+## Loading required package:
+
+```{r}
+library(caret)
+library(rattle)
+library(rpart)
+library(RColorBrewer)
+library(rpart.plot)
+library(randomForest)
+```
+
+## Getting Data
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# Download data.
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+```
+
+## Cleaning the data
+
+```{r}
+colnames_train <- colnames(training)
+colnames_test <- colnames(testing)
+# Count the number of non-NAs in each col.
+nonNAs <- function(x) {
+    as.vector(apply(x, 2, function(x) length(which(!is.na(x)))))
+}
+
+# Build vector of missing data or NA columns to drop.
+colcnts <- nonNAs(training)
+drops <- c()
+for (cnt in 1:length(colcnts)) {
+    if (colcnts[cnt] < nrow(training)) {
+        drops <- c(drops, colnames_train[cnt])
+    }
+}
+
+# Drop NA data and the first 7 columns as they're unnecessary for predicting.
+training <- training[,!(names(training) %in% drops)]
+training <- training[,8:length(colnames(training))]
+
+testing <- testing[,!(names(testing) %in% drops)]
+testing <- testing[,8:length(colnames(testing))]
+
+# Show remaining Training columns.
+dim(training)
+
+# Show remaining Training columns.
+dim(testing)
+
+# check for covariates that have virtually no variablility.
+
+nsv <- nearZeroVar(training, saveMetrics=TRUE)
+nsv
+```
+
+## Partitioning the traning data for cross validation
+
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+myTraining <- training[inTrain, ]; myTesting <- training[-inTrain, ]
+dim(myTraining); dim(myTesting)
+```
+
+## Algorithms for prediction: Decision Tree
+
+```{r}
+modFitA1 <- rpart(classe ~ ., data=myTraining, method="class")
+
+fancyRpartPlot(modFitA1)
+```
+
+## Prediction
+
+```{r}
+predictionsA1 <- predict(modFitA1, myTesting, type = "class")
+confusionMatrix(predictionsA1, myTesting$classe)
+```
+
+## Algorithms for prediction: Random Forests
+
+```{r}
+modFitB1 <- randomForest(classe ~. , data=myTraining)
+```
+
+## Prediction
+
+```{r}
+predictionsB1 <- predict(modFitB1, myTesting, type = "class")
+confusionMatrix(predictionsB1, myTesting$classe)
+```
+
+# Random Forests yielded better Results with 99% accuracy.
+
+## Using the provided Test Set
+
+```{r}
+predictionsB2 <- predict(modFitB1, testing, type = "class")
+print(predictionsB2)
+```
+
